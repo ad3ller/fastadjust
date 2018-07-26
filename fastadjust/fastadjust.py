@@ -161,7 +161,7 @@ class FastAdjust(object):
             [numpy.array(), numpy.array(), numpy.array()]
                 ex, ey, ez
         """
-        return np.gradient(self.potential(voltages), self.dx, self.dy, self.dz)
+        return np.gradient(self.potential(voltages), *self.delta)
 
     def amp_field(self, voltages, subset=None):
         """ The amplitude of the electric field.
@@ -193,7 +193,7 @@ class FastAdjust(object):
             [numpy.array(), numpy.array(), numpy.array()]
                 gx, gy, gz
         """
-        return np.gradient(self.amp_field(voltages), self.dx, self.dy, self.dz)
+        return np.gradient(self.amp_field(voltages), *self.delta)
 
     """ ==========================================================
         point (xyz) methods
