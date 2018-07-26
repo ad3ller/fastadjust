@@ -39,6 +39,8 @@ class FastAdjust(object):
             grid_r          : convert real coordinates to grid coordinates
             inside_r        : is (x, y, z) inside the pa?
             electrode_r     : is (x, y, z) an electrode?
+            interp_r        : interpolate grid values at (x, y, z)
+            grad_r          : gradient of grid values at (x, y, z)
             pa_r            : fast-adjust potentials interpolated at (x, y, z)
             potential_r     : electric potential at (x, y, z) for a set of applied voltages
             field_r         : electric field at (x, y, z) for a set of applied voltages
@@ -224,7 +226,7 @@ class FastAdjust(object):
 
             Parameters
             ----------
-            coord    : tuple (x : float64, y : float64, z : float64)
+            coord    : tuple (x, y, z)
 
             Returns
             -------
@@ -242,7 +244,7 @@ class FastAdjust(object):
 
             Parameters
             ----------
-            coord    : tuple (x : float64, y : float64, z : float64)  
+            coord    : tuple (x, y, z)
 
             Returns
             -------
@@ -256,7 +258,7 @@ class FastAdjust(object):
 
             Parameters
             ----------
-            coord    : tuple (x : float64, y : float64, z : float64)
+            coord    : tuple (x, y, z)
             outside  : return if coord is outside pa, e.g., bool or np.nan 
                        (default: True, i.e., anywhere outside the pa is considered an electrode)
             
@@ -275,22 +277,24 @@ class FastAdjust(object):
         else:
             return outside
 
-    def pa_r(self, coord):
-        """ fast-adjust potential array at coord=(x, y, z)
-
+    def interp_r(self, phi, coord):
+        """ interpolate phi at coord=(x, y, z)
+        
             Parameters
             ----------
-            coord    : tuple (x : float64, y : float64, z : float64)
+            phi      : np.array() 
+            coord    : tuple (x, y, z)
 
             Returns
             -------
-            numpy.array()
+            float64
         """
+        assert list(phi.shape)[:3] == list(self.shape), "shape of phi must match FastAdjust()"
         # grid coordinate
         xg, yg, zg = self.grid_r(coord)
         if (0 <= xg <= self.nx - 1) and (0 <= yg <= self.ny - 1) and (0 <= zg <= self.nz - 1):
             if xg == int(xg) and yg == int(yg) and zg == int(zg):
-                return self.pa[int(xg), int(yg), int(zg)]
+                return phi[int(xg), int(yg), int(zg)]
             else:
                 # try trilinear interpolation
                 try:
@@ -303,10 +307,10 @@ class FastAdjust(object):
                     z1 = z0 + 1
                     ## interpolate along x
                     wx = (xg - x0)
-                    c00 = self.pa[x0, y0, z0] * (1 - wx) + self.pa[x1, y0, z0] * wx
-                    c01 = self.pa[x0, y0, z1] * (1 - wx) + self.pa[x1, y0, z1] * wx
-                    c10 = self.pa[x0, y1, z0] * (1 - wx) + self.pa[x1, y1, z0] * wx
-                    c11 = self.pa[x0, y1, z1] * (1 - wx) + self.pa[x1, y1, z1] * wx
+                    c00 = phi[x0, y0, z0] * (1 - wx) + phi[x1, y0, z0] * wx
+                    c01 = phi[x0, y0, z1] * (1 - wx) + phi[x1, y0, z1] * wx
+                    c10 = phi[x0, y1, z0] * (1 - wx) + phi[x1, y1, z0] * wx
+                    c11 = phi[x0, y1, z1] * (1 - wx) + phi[x1, y1, z1] * wx
                     ## interpolate along y
                     wy = (yg - y0)
                     c0 = c00 * (1 - wy) + c10 * wy
@@ -322,12 +326,46 @@ class FastAdjust(object):
         else:
             return np.nan
 
+    def grad_r(self, phi, coord):
+        """ gradient of phi at coord=(x, y, z)
+
+            Parameters
+            ----------
+            phi      : np.array() 
+            coord    : tuple (x, y, z)
+
+            Returns
+            -------
+            numpy.array()
+        """
+        x, y, z = coord
+        gx = (self.interp_r(phi, (x + self.dx / 2.0, y, z)) - 
+              self.interp_r(phi, (x - self.dx / 2.0, y, z))) / self.dx
+        gy = (self.interp_r(phi, (x, y + self.dy / 2.0, z)) - 
+              self.interp_r(phi, (x, y - self.dy / 2.0, z))) / self.dy
+        gz = (self.interp_r(phi, (x, y, z + self.dz / 2.0)) - 
+              self.interp_r(phi, (x, y, z - self.dz / 2.0))) / self.dz
+        return gx, gy, gz
+
+    def pa_r(self, coord):
+        """ fast-adjust potential array at coord=(x, y, z)
+
+            Parameters
+            ----------
+            coord    : tuple (x, y, z)
+
+            Returns
+            -------
+            numpy.array()
+        """
+        return self.interp_r(self.pa, coord)
+
     def potential_r(self, coord, voltages):
         """ electric potential at coord=(x, y, z)
 
             Parameters
             ----------
-            coord    : tuple (x : float64, y : float64, z : float64)
+            coord    : tuple (x, y, z)
             voltages : numpy.array()
 
             Returns
@@ -343,12 +381,12 @@ class FastAdjust(object):
 
             Parameters
             ----------
-            coord    : tuple (x : float64, y : float64, z : float64)
+            coord    : tuple (x, y, z)
             voltages : numpy.array()
 
             Returns
             -------
-            numpy.array()
+            ex, ey, ez
         """
         x, y, z = coord
         ex = (self.potential_r((x + self.dx / 2.0, y, z), voltages) - 
@@ -357,14 +395,14 @@ class FastAdjust(object):
               self.potential_r((x, y - self.dy / 2.0, z), voltages)) / self.dy
         ez = (self.potential_r((x, y, z + self.dz / 2.0), voltages) - 
               self.potential_r((x, y, z - self.dz / 2.0), voltages)) / self.dz
-        return np.array([ex, ey, ez])
+        return ex, ey, ez
 
     def amp_field_r(self, coord, voltages):
         """ amplitude of the field at coord=(x, y, z)
 
             Parameters
             ----------
-            coord    : tuple (x : float64, y : float64, z : float64)
+            coord    : tuple (x, y, z)
             voltages : numpy.array()
 
             Returns
@@ -379,12 +417,12 @@ class FastAdjust(object):
 
             Parameters
             ----------
-            coord    : tuple (x : float64, y : float64, z : float64)
+            coord    : tuple (x, y, z)
             voltages : numpy.array()
 
             Returns
             -------
-            numpy.array()
+            gx, gy, gz
         """
         x, y, z = coord
         gx = (self.amp_field_r((x + self.dx / 2.0, y, z), voltages) - 
@@ -393,4 +431,4 @@ class FastAdjust(object):
               self.amp_field_r((x, y - self.dy / 2.0, z), voltages)) / self.dy
         gz = (self.amp_field_r((x, y, z + self.dz / 2.0), voltages) - 
               self.amp_field_r((x, y, z - self.dz / 2.0), voltages)) / self.dz
-        return np.array([gx, gy, gz])
+        return gx, gy, gz
