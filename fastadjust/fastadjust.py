@@ -127,7 +127,7 @@ class FastAdjust(object):
     """ 
 
     def grid(self):
-        """ Grid corresponding to pa.
+        """ grid corresponding to pa
 
             Returns
             -------
@@ -137,7 +137,7 @@ class FastAdjust(object):
         return np.meshgrid(self.xvals, self.yvals, self.zvals, indexing='ij')
 
     def potential(self, voltages):
-        """ The electric potential.
+        """ electric potential
 
             Parameters
             ----------
@@ -151,7 +151,7 @@ class FastAdjust(object):
         return np.sum(self.pa * voltages, axis=-1)
 
     def field(self, voltages):
-        """ The electric field.
+        """ electric field
 
             Parameters
             ----------
@@ -166,7 +166,7 @@ class FastAdjust(object):
         return np.gradient(self.potential(voltages), *self.delta)
 
     def amp_field(self, voltages, subset=None):
-        """ The amplitude of the electric field.
+        """ amplitude of the electric field
 
             Parameters
             ----------
@@ -183,7 +183,7 @@ class FastAdjust(object):
         return np.sum(ei**2.0, axis=0)**0.5
 
     def grad_field(self, voltages):
-        """ The gradient of the electric field.
+        """ gradient of the electric field
 
             Parameters
             ----------
@@ -203,7 +203,7 @@ class FastAdjust(object):
     """
 
     def real_g(self, grid_coord):
-        """ Convert grid coordinates to real coordinates (i.e., the inverse of grid_r) 
+        """ convert grid coordinates to real coordinates (i.e., the inverse of grid_r) 
         
             Parameters
             ----------
@@ -222,7 +222,7 @@ class FastAdjust(object):
 
 
     def grid_r(self, coord):
-        """ Convert real coordinates into grid coordinates.
+        """ convert real coordinates into grid coordinates
 
             Parameters
             ----------
@@ -240,7 +240,7 @@ class FastAdjust(object):
         return xg, yg, zg
 
     def inside_r(self, coord):
-        """ Is coord=(x, y, z) inside the pa boundary?
+        """ is coord=(x, y, z) inside the pa boundary?
 
             Parameters
             ----------
@@ -254,7 +254,7 @@ class FastAdjust(object):
         return (0.0 <= xg <= self.nx - 1.0) and (0.0 <= yg <= self.ny - 1.0) and (0.0 <= zg <= self.nz - 1.0)
 
     def electrode_r(self, coord, outside=True):
-        """ Is nearest grid point to coord=(x, y, z) an electrode? 
+        """ is nearest grid point to coord=(x, y, z) an electrode? 
 
             Parameters
             ----------
@@ -368,6 +368,48 @@ class FastAdjust(object):
             coord    : tuple (x, y, z)
             voltages : numpy.array()
 
+            Returns
+            -------
+            float64
+        """
+        assert len(voltages == self.num_el), "length of voltages must match the number of electrodes"
+        # grid coordinate
+        xg, yg, zg = self.grid_r(coord)
+        # try trilinear interpolation
+        try:
+            ## enclosing cube coordinates
+            xn = int(floor(xg))
+            yn = int(floor(yg))
+            zn = int(floor(zg))
+            phi = np.sum(self.pa[xn : xn + 2, yn : yn + 2, zn : zn + 2, :] * voltages, axis=-1)
+            ## interpolate along x
+            wx = (xg - xn)
+            c00 = phi[0, 0, 0] * (1 - wx) + phi[1, 0, 0] * wx
+            c01 = phi[0, 0, 1] * (1 - wx) + phi[1, 0, 1] * wx
+            c10 = phi[0, 1, 0] * (1 - wx) + phi[1, 1, 0] * wx
+            c11 = phi[0, 1, 1] * (1 - wx) + phi[1, 1, 1] * wx
+            ## interpolate along y
+            wy = (yg - yn)
+            c0 = c00 * (1 - wy) + c10 * wy
+            c1 = c01 * (1 - wy) + c11 * wy
+            ## interpolate along z
+            wz = (zg - zn)
+            c = c0 * (1 - wz) + c1 * wz
+            return c
+        except IndexError:
+            return np.nan
+        except:
+            raise
+
+    def phi_r(self, coord, voltages):
+        """ electric potential at coord=(x, y, z)
+            
+            legacy (slower) version of potential_r().
+
+            Parameters
+            ----------
+            coord    : tuple (x, y, z)
+            voltages : numpy.array()
             Returns
             -------
             float64
