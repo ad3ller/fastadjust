@@ -1,9 +1,5 @@
 # FastAdjust
 
-work in progress -- expect bugs and API changes
-
-## About
-
 Tools for working with 3D SIMION electric potential arrays and for converting them to HDF5.
 
 Features:
