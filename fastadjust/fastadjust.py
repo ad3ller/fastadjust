@@ -239,6 +239,20 @@ class FastAdjust(object):
         zg = (z - self.z0) / self.dz 
         return xg, yg, zg
 
+    def inside_g(self, grid_coord):
+        """ is grid_coord=(xg, yg, zg) inside the pa boundary?
+
+            Parameters
+            ----------
+            grid_coord    : tuple (xg, yg, zg)
+
+            Returns
+            -------
+            bool
+        """
+        xg, yg, zg = grid_coord
+        return (0.0 <= xg <= self.nx - 1.0) and (0.0 <= yg <= self.ny - 1.0) and (0.0 <= zg <= self.nz - 1.0)
+
     def inside_r(self, coord):
         """ is coord=(x, y, z) inside the pa boundary?
 
@@ -250,8 +264,32 @@ class FastAdjust(object):
             -------
             bool
         """
-        xg, yg, zg = self.grid_r(coord)
-        return (0.0 <= xg <= self.nx - 1.0) and (0.0 <= yg <= self.ny - 1.0) and (0.0 <= zg <= self.nz - 1.0)
+        grid_coord = self.grid_r(coord)
+        return  self.inside_g(grid_coord)
+
+    def electrode_g(self, grid_coord, outside=True):
+        """ is nearest grid point to grid_coord=(xg, yg, zg) an electrode? 
+
+            Parameters
+            ----------
+            grid_coord    : tuple (xg, yg, zg)
+            outside       : return if coord is outside pa, e.g., bool or np.nan 
+                           (default: True, i.e., anywhere outside the pa is considered an electrode)
+            
+            Returns
+            -------
+            bool (or outside)
+        """
+        # grid coordinate
+        xg, yg, zg = grid_coord
+        if (0 <= xg <= self.nx - 1) and (0 <= yg <= self.ny - 1) and (0 <= zg <= self.nz - 1):
+            # nearest grid point
+            xn = int(round(xg))
+            yn = int(round(yg))
+            zn = int(round(zg))
+            return self.electrode[xn, yn, zn]
+        else:
+            return outside
 
     def electrode_r(self, coord, outside=True):
         """ is nearest grid point to coord=(x, y, z) an electrode? 
@@ -266,32 +304,23 @@ class FastAdjust(object):
             -------
             bool (or outside)
         """
-        # grid coordinate
-        xg, yg, zg = self.grid_r(coord)
-        if (0 <= xg <= self.nx - 1) and (0 <= yg <= self.ny - 1) and (0 <= zg <= self.nz - 1):
-            # nearest grid point
-            xn = int(round(xg))
-            yn = int(round(yg))
-            zn = int(round(zg))
-            return self.electrode[xn, yn, zn]
-        else:
-            return outside
+        grid_coord = self.grid_r(coord)
+        self.electrode_g(grid_coord, outside=outside)
 
-    def interp_r(self, phi, coord):
-        """ interpolate phi at coord=(x, y, z)
+    def interp_g(self, phi, grid_coord):
+        """ interpolate phi at grid_coord=(xg, yg, zg)
         
             Parameters
             ----------
-            phi      : np.array() 
-            coord    : tuple (x, y, z)
+            phi           : np.array() 
+            grid_coord    : tuple (xg, yg, zg)
 
             Returns
             -------
             float64
         """
-        assert list(phi.shape)[:3] == list(self.shape), "shape of phi must match FastAdjust()"
         # grid coordinate
-        xg, yg, zg = self.grid_r(coord)
+        xg, yg, zg = grid_coord
         if (0 <= xg <= self.nx - 1) and (0 <= yg <= self.ny - 1) and (0 <= zg <= self.nz - 1):
             if xg == int(xg) and yg == int(yg) and zg == int(zg):
                 return phi[int(xg), int(yg), int(zg)]
@@ -326,6 +355,43 @@ class FastAdjust(object):
         else:
             return np.nan
 
+    def interp_r(self, phi, coord):
+        """ interpolate phi at coord=(x, y, z)
+        
+            Parameters
+            ----------
+            phi      : np.array() 
+            coord    : tuple (x, y, z)
+
+            Returns
+            -------
+            float64
+        """
+        grid_coord = self.grid_r(coord)
+        return self.interp_g(phi, grid_coord)
+        
+
+    def grad_g(self, phi, grid_coord):
+        """ gradient of phi at grid_coord=(xg, yg, zg)
+
+            Parameters
+            ----------
+            phi           : np.array() 
+            grid_coord    : tuple (xg, yg, zg)
+
+            Returns
+            -------
+            numpy.array()
+        """
+        xg, yg, zg = grid_coord
+        gx = (self.interp_g(phi, (xg + 0.5, yg, zg)) - 
+              self.interp_g(phi, (xg - 0.5, yg, zg))) / self.dx
+        gy = (self.interp_g(phi, (xg, yg + 0.5, zg)) - 
+              self.interp_g(phi, (xg, yg - 0.5, zg))) / self.dy
+        gz = (self.interp_g(phi, (xg, yg, zg + 0.5)) - 
+              self.interp_g(phi, (xg, yg, zg - 0.5))) / self.dz
+        return gx, gy, gz
+
     def grad_r(self, phi, coord):
         """ gradient of phi at coord=(x, y, z)
 
@@ -338,14 +404,21 @@ class FastAdjust(object):
             -------
             numpy.array()
         """
-        x, y, z = coord
-        gx = (self.interp_r(phi, (x + self.dx / 2.0, y, z)) - 
-              self.interp_r(phi, (x - self.dx / 2.0, y, z))) / self.dx
-        gy = (self.interp_r(phi, (x, y + self.dy / 2.0, z)) - 
-              self.interp_r(phi, (x, y - self.dy / 2.0, z))) / self.dy
-        gz = (self.interp_r(phi, (x, y, z + self.dz / 2.0)) - 
-              self.interp_r(phi, (x, y, z - self.dz / 2.0))) / self.dz
-        return gx, gy, gz
+        grid_coord = self.grid_r(coord)
+        return self.grad_g(phi, grid_coord)
+
+    def pa_g(self, grid_coord):
+        """ fast-adjust potential array at grid_coord=(xg, yg, zg)
+
+            Parameters
+            ----------
+            grid_coord    : tuple (xg, yg, zg)
+
+            Returns
+            -------
+            numpy.array()
+        """
+        return self.interp_g(self.pa, grid_coord)
 
     def pa_r(self, coord):
         """ fast-adjust potential array at coord=(x, y, z)
@@ -358,23 +431,22 @@ class FastAdjust(object):
             -------
             numpy.array()
         """
-        return self.interp_r(self.pa, coord)
+        grid_coord = self.grid_r(coord)
+        return self.pa_g(grid_coord)
 
-    def potential_r(self, coord, voltages):
-        """ electric potential at coord=(x, y, z)
+    def potential_g(self, grid_coord, voltages):
+        """ electric potential at grid_coord=(xg, yg, zg)
 
             Parameters
             ----------
-            coord    : tuple (x, y, z)
-            voltages : numpy.array()
+            grid_coord    : tuple (xg, yg, zg)
+            voltages      : numpy.array()
 
             Returns
             -------
             float64
         """
-        assert len(voltages == self.num_el), "length of voltages must match the number of electrodes"
-        # grid coordinate
-        xg, yg, zg = self.grid_r(coord)
+        xg, yg, zg = grid_coord
         # try trilinear interpolation
         try:
             ## enclosing cube coordinates
@@ -401,6 +473,21 @@ class FastAdjust(object):
         except:
             raise
 
+    def potential_r(self, coord, voltages):
+        """ electric potential at coord=(x, y, z)
+
+            Parameters
+            ----------
+            coord    : tuple (x, y, z)
+            voltages : numpy.array()
+
+            Returns
+            -------
+            float64
+        """
+        grid_coord = self.grid_r(coord)
+        return self.potential_g(grid_coord, voltages)
+
     def phi_r(self, coord, voltages):
         """ electric potential at coord=(x, y, z)
             
@@ -418,6 +505,27 @@ class FastAdjust(object):
         phi = np.sum(self.pa_r(coord) * voltages)
         return phi
 
+    def field_g(self, grid_coord, voltages):
+        """ electric field at grid_coord=(xg, yg, zg)
+
+            Parameters
+            ----------
+            grid_coord    : tuple (xg, yg, zg)
+            voltages      : numpy.array()
+
+            Returns
+            -------
+            ex, ey, ez
+        """
+        xg, yg, zg = grid_coord
+        ex = (self.potential_g((xg + 0.5, yg, zg), voltages) - 
+              self.potential_g((xg - 0.5, yg, zg), voltages)) / self.dx
+        ey = (self.potential_g((xg, yg + 0.5, zg), voltages) - 
+              self.potential_g((xg, yg - 0.5, zg), voltages)) / self.dy
+        ez = (self.potential_g((xg, yg, zg + 0.5), voltages) - 
+              self.potential_g((xg, yg, zg - 0.5), voltages)) / self.dz
+        return ex, ey, ez
+
     def field_r(self, coord, voltages):
         """ electric field at coord=(x, y, z)
 
@@ -430,14 +538,23 @@ class FastAdjust(object):
             -------
             ex, ey, ez
         """
-        x, y, z = coord
-        ex = (self.potential_r((x + self.dx / 2.0, y, z), voltages) - 
-              self.potential_r((x - self.dx / 2.0, y, z), voltages)) / self.dx
-        ey = (self.potential_r((x, y + self.dy / 2.0, z), voltages) - 
-              self.potential_r((x, y - self.dy / 2.0, z), voltages)) / self.dy
-        ez = (self.potential_r((x, y, z + self.dz / 2.0), voltages) - 
-              self.potential_r((x, y, z - self.dz / 2.0), voltages)) / self.dz
-        return ex, ey, ez
+        grid_coord = self.grid_r(coord)
+        return self.field_g(grid_coord, voltages)
+
+    def amp_field_g(self, grid_coord, voltages):
+        """ amplitude of the field at grid_coord=(xg, yg, zg)
+
+            Parameters
+            ----------
+            grid_coord    : tuple (xg, yg, zg)
+            voltages      : numpy.array()
+
+            Returns
+            -------
+            float64
+        """
+        ex, ey, ez = self.field_g(grid_coord, voltages)
+        return (ex**2.0 + ey**2.0 + ez**2.0)**0.5
 
     def amp_field_r(self, coord, voltages):
         """ amplitude of the field at coord=(x, y, z)
@@ -451,8 +568,29 @@ class FastAdjust(object):
             -------
             float64
         """
-        ex, ey, ez = self.field_r(coord, voltages)
-        return (ex**2.0 + ey**2.0 + ez**2.0)**0.5
+        grid_coord = self.grid_r(coord)
+        return self.amp_field_g(grid_coord, voltages)
+
+    def grad_field_g(self, grid_coord, voltages):
+        """ gradient of the amplitude of the field at grid_coord=(xg, yg, zg)
+
+            Parameters
+            ----------
+            grid_coord    : tuple (xg, yg, zg)
+            voltages      : numpy.array()
+
+            Returns
+            -------
+            gx, gy, gz
+        """
+        xg, yg, zg = grid_coord
+        gx = (self.amp_field_g((xg + 0.5, yg, zg), voltages) - 
+              self.amp_field_g((xg - 0.5, yg, zg), voltages)) / self.dx
+        gy = (self.amp_field_g((xg, yg + 0.5, zg), voltages) - 
+              self.amp_field_g((xg, yg - 0.5, zg), voltages)) / self.dy
+        gz = (self.amp_field_g((xg, yg, zg + 0.5), voltages) - 
+              self.amp_field_g((xg, yg, zg - 0.5), voltages)) / self.dz
+        return gx, gy, gz
 
     def grad_field_r(self, coord, voltages):
         """ gradient of the amplitude of the field at coord=(x, y, z)
@@ -466,11 +604,5 @@ class FastAdjust(object):
             -------
             gx, gy, gz
         """
-        x, y, z = coord
-        gx = (self.amp_field_r((x + self.dx / 2.0, y, z), voltages) - 
-              self.amp_field_r((x - self.dx / 2.0, y, z), voltages)) / self.dx
-        gy = (self.amp_field_r((x, y + self.dy / 2.0, z), voltages) - 
-              self.amp_field_r((x, y - self.dy / 2.0, z), voltages)) / self.dy
-        gz = (self.amp_field_r((x, y, z + self.dz / 2.0), voltages) - 
-              self.amp_field_r((x, y, z - self.dz / 2.0), voltages)) / self.dz
-        return gx, gy, gz
+        grid_coord = self.grid_r(coord)
+        return self.grad_field_g(grid_coord, voltages)

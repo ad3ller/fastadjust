@@ -3,7 +3,7 @@ import sys
 from setuptools import setup
 
 setup(name='fastadjust',
-      version='0.0.1',
+      version='0.0.2',
       description='fast adjust SIMION potential arrays',
       url='',
       author='Adam Deller',
