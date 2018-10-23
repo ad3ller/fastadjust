@@ -305,7 +305,7 @@ class FastAdjust(object):
             bool (or outside)
         """
         grid_coord = self.grid_r(coord)
-        self.electrode_g(grid_coord, outside=outside)
+        return self.electrode_g(grid_coord, outside=outside)
 
     def interp_g(self, phi, grid_coord):
         """ interpolate phi at grid_coord=(xg, yg, zg)
