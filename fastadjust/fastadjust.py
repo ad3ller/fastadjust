@@ -518,13 +518,74 @@ class FastAdjust(object):
             ex, ey, ez
         """
         xg, yg, zg = grid_coord
-        ex = (self.potential_g((xg + 0.5, yg, zg), voltages) - 
-              self.potential_g((xg - 0.5, yg, zg), voltages)) / self.dx
-        ey = (self.potential_g((xg, yg + 0.5, zg), voltages) - 
-              self.potential_g((xg, yg - 0.5, zg), voltages)) / self.dy
-        ez = (self.potential_g((xg, yg, zg + 0.5), voltages) - 
-              self.potential_g((xg, yg, zg - 0.5), voltages)) / self.dz
-        return ex, ey, ez
+        # trilinear gradient interpolation
+        try:
+            ## enclosing cube coordinates
+            xn = int(floor(xg))
+            yn = int(floor(yg))
+            zn = int(floor(zg))
+            phi = np.sum(self.pa[xn - 1 : xn + 3, yn - 1 : yn + 3, zn - 1: zn + 3, :] * voltages, axis=-1)
+            
+            ## interpolation
+            wx = (xg - xn)
+            wy = (yg - yn)
+            wz = (zg - zn)
+            
+            # Ex
+            if wx < 0.5:
+                ex11 = (phi[1, 1, 1] - phi[0, 1, 1]) * (0.5 - wx) + (phi[2, 1, 1] - phi[1, 1, 1]) * (0.5 + wx)
+                ex12 = (phi[1, 1, 2] - phi[0, 1, 2]) * (0.5 - wx) + (phi[2, 1, 2] - phi[1, 1, 2]) * (0.5 + wx)
+                ex21 = (phi[1, 2, 1] - phi[0, 2, 1]) * (0.5 - wx) + (phi[2, 2, 1] - phi[1, 2, 1]) * (0.5 + wx)
+                ex22 = (phi[1, 2, 2] - phi[0, 2, 2]) * (0.5 - wx) + (phi[2, 2, 2] - phi[1, 2, 2]) * (0.5 + wx)
+            else:
+                ex11 = (phi[3, 1, 1] - phi[2, 1, 1]) * (wx - 0.5) + (phi[2, 1, 1] - phi[1, 1, 1]) * (1.5 - wx)
+                ex12 = (phi[3, 1, 2] - phi[2, 1, 2]) * (wx - 0.5) + (phi[2, 1, 2] - phi[1, 1, 2]) * (1.5 - wx)
+                ex21 = (phi[3, 2, 1] - phi[2, 2, 1]) * (wx - 0.5) + (phi[2, 2, 1] - phi[1, 2, 1]) * (1.5 - wx)
+                ex22 = (phi[3, 2, 2] - phi[2, 2, 2]) * (wx - 0.5) + (phi[2, 2, 2] - phi[1, 2, 2]) * (1.5 - wx)
+            ## interpolate along y
+            ex1 = ex11 * (1 - wy) + ex21 * wy
+            ex2 = ex12 * (1 - wy) + ex22 * wy
+            ## interpolate along z
+            ex = (ex1 * (1 - wz) + ex2 * wz ) / self.dx
+            
+            # Ey
+            if wy < 0.5:
+                ey11 = (phi[1, 1, 1] - phi[1, 0, 1]) * (0.5 - wy) + (phi[1, 2, 1] - phi[1, 1, 1]) * (0.5 + wy)
+                ey12 = (phi[1, 1, 2] - phi[1, 0, 2]) * (0.5 - wy) + (phi[1, 2, 2] - phi[1, 1, 2]) * (0.5 + wy)
+                ey21 = (phi[2, 1, 1] - phi[2, 0, 1]) * (0.5 - wy) + (phi[2, 2, 1] - phi[2, 1, 1]) * (0.5 + wy)
+                ey22 = (phi[2, 1, 2] - phi[2, 0, 2]) * (0.5 - wy) + (phi[2, 2, 2] - phi[2, 1, 2]) * (0.5 + wy)
+            else:
+                ey11 = (phi[1, 3, 1] - phi[1, 2, 1]) * (wy - 0.5) + (phi[1, 2, 1] - phi[1, 1, 1]) * (1.5 - wy)
+                ey12 = (phi[1, 3, 2] - phi[1, 2, 2]) * (wy - 0.5) + (phi[1, 2, 2] - phi[1, 1, 2]) * (1.5 - wy)
+                ey21 = (phi[2, 3, 1] - phi[2, 2, 1]) * (wy - 0.5) + (phi[2, 2, 1] - phi[2, 1, 1]) * (1.5 - wy)
+                ey22 = (phi[2, 3, 2] - phi[2, 2, 2]) * (wy - 0.5) + (phi[2, 2, 2] - phi[2, 1, 2]) * (1.5 - wy)
+            ## interpolate along x
+            ey1 = ey11 * (1 - wx) + ey21 * wx
+            ey2 = ey12 * (1 - wx) + ey22 * wx
+            ## interpolate along z
+            ey = (ey1 * (1 - wz) + ey2 * wz ) / self.dy
+
+            # Ez
+            if wz < 0.5:
+                ez11 = (phi[1, 1, 1] - phi[1, 1, 0]) * (0.5 - wz) + (phi[1, 1, 2] - phi[1, 1, 1]) * (0.5 + wz)
+                ez12 = (phi[1, 2, 1] - phi[1, 2, 0]) * (0.5 - wz) + (phi[1, 2, 2] - phi[1, 2, 1]) * (0.5 + wz)
+                ez21 = (phi[2, 1, 1] - phi[2, 1, 0]) * (0.5 - wz) + (phi[2, 1, 2] - phi[2, 1, 1]) * (0.5 + wz)
+                ez22 = (phi[2, 2, 1] - phi[2, 2, 0]) * (0.5 - wz) + (phi[2, 2, 2] - phi[2, 2, 1]) * (0.5 + wz)
+            else:
+                ez11 = (phi[1, 1, 3] - phi[1, 1, 2]) * (wz - 0.5) + (phi[1, 1, 2] - phi[1, 1, 1]) * (1.5 - wz)
+                ez12 = (phi[1, 2, 3] - phi[1, 2, 2]) * (wz - 0.5) + (phi[1, 2, 2] - phi[1, 2, 1]) * (1.5 - wz)
+                ez21 = (phi[2, 1, 3] - phi[2, 1, 2]) * (wz - 0.5) + (phi[2, 1, 2] - phi[2, 1, 1]) * (1.5 - wz)
+                ez22 = (phi[2, 2, 3] - phi[2, 2, 2]) * (wz - 0.5) + (phi[2, 2, 2] - phi[2, 2, 1]) * (1.5 - wz)
+            ## interpolate along x
+            ez1 = ez11 * (1 - wx) + ez21 * wx
+            ez2 = ez12 * (1 - wx) + ez22 * wx
+            ## interpolate along y
+            ez = (ez1 * (1 - wy) + ez2 * wy ) / self.dz
+            return ex, ey, ez
+        except IndexError:
+            return np.nan, np.nan, np.nan
+        except:
+            raise
 
     def field_r(self, coord, voltages):
         """ electric field at coord=(x, y, z)

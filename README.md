@@ -7,11 +7,6 @@ Features:
 - calculate the potential or field at a given position for a set of applied voltages (e.g., for trajectory calculations with time-varying voltages)  
 - convert potential array data to HDF5 (useful for subsequently working with, for example, python 3 or Julia). 
 
-TODO
-- 2D potential arrays
-- slicing
-- larger-than-physical-memory potential arrays (dask arrays).
-
 ## Install
 
 Requires a copy of the SIMION python API, for which you'll also need a python 2.7 environment. To create a new environment using anaconda, see https://conda.io/docs/user-guide/tasks/manage-python.html
