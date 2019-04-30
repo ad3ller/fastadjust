@@ -5,19 +5,23 @@ Created on Fri Jun  8 11:00:15 2018
 @author: Adam
 """
 import sys
+import warnings
 import os
 import numpy as np
 from .fastadjust import FastAdjust
-PATH = "C:\Program Files\SIMION-8.1\lib\python"
 
 # checks
-assert int(sys.version_info[0]) == 2, "SIMION python API only supports python 2.x"
+PATH = "C:\Program Files\SIMION-8.1\lib\python"
 assert os.path.exists(PATH), "SIMION python API not found. Check PATH in fastadjust.simion.py"
 
 # load SIMION.PA
 if PATH not in sys.path:
     sys.path.append(PATH)
-from SIMION.PA import PA
+try:
+    from SIMION.PA import PA
+except:
+    warnings.warn("SIMION.PA does not support python 3.  Use fastadjust with python 2.x or try `2to3 -w PA.py`")
+    raise
 
 def pa2npy(fils):
     """ Load SIMION PA files and convert them to normalised numpy.arrays()

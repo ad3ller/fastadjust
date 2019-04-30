@@ -7,6 +7,7 @@ Created on Fri Jun  8 11:00:15 2018
 from math import floor
 import numpy as np
 
+
 class FastAdjust(object):
     """ A class for working with three-dimensional fast-adjust potential arrays.
     
