@@ -28,7 +28,9 @@ python setup.py install
 
 ## Notes
 
-Currently, the SIMION python API does not support python 3, therefore python 2.7 is needed for converting PAs to HDF5.  The other features of `fastadjust` work in python 2 or 3. To create a python 2.7 environment see https://conda.io/docs/user-guide/tasks/manage-python.html
+The SIMION python API does not support python 3 and python 2.7 is needed for converting PAs to HDF5.  The other features of `fastadjust` work in python 2 or 3. 
+
+To create a python 2.7 environment see https://conda.io/docs/user-guide/tasks/manage-python.html
 
 Alternatively, you could try:
 
