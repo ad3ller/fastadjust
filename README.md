@@ -9,8 +9,6 @@ Features:
 
 ## Install
 
-`fastadjust` includes tools for converting SIMION potential arrays (PA files) to HDF5 data.  It makes use of the SIMION 8.1 python API.
-
 Clone the source,
 
 ```
@@ -28,7 +26,7 @@ python setup.py install
 
 ## Notes
 
-The SIMION python API, which is used to convert PAs to HDF5, does not support python 3.  The other features of `fastadjust` work in python 2 or 3. 
+The SIMION 8.1 python API, which is used by `fastadjust` to convert PAs to HDF5, does not support python 3.  The other features of `fastadjust` work in python 2 or 3. 
 
 To create a python 2.7 environment see https://conda.io/docs/user-guide/tasks/manage-python.html
 
