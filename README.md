@@ -7,6 +7,9 @@ Features:
 - fast adjust potential arrays for a set of applied voltages
 - efficiently calculate the potential or field at a given coordinate (e.g., for trajectory calculations)
 
+TODO:
+ - add support for SIMION files that utilise symmetry
+
 ## Install
 
 Clone the source,
