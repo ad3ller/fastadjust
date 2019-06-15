@@ -3,7 +3,7 @@
 Tools for working with 3D SIMION potential arrays and for converting them to HDF5.
 
 Features:
-- convert SIMION potential array files to HDF5
+- convert 3D SIMION potential array files to HDF5
 - fast adjust potential arrays for a set of applied voltages
 - efficiently calculate the potential or field at a given coordinate (e.g., for trajectory calculations)
 
