@@ -33,7 +33,6 @@ The SIMION 8.1 python API, which is used by `fastadjust` to convert PAs to HDF5,
 
 To create a python 2.7 environment, see https://conda.io/docs/user-guide/tasks/manage-python.html
 
-```
 
 ## Usage
 
